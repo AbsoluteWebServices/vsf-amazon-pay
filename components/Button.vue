@@ -4,7 +4,12 @@
 
 <script>
 import config from 'config'
+import i18n from '@vue-storefront/i18n'
 
+const TYPE_LOGIN = 'LwA'
+const TYPE_PAY = 'PwA'
+
+// TODO: add login button functionality
 export default {
   name: 'AmazonPayButton',
   props: {
@@ -12,7 +17,7 @@ export default {
       type: String,
       required: true,
       validator: function (value) {
-        return ['LwA', 'PwA'].indexOf(value) !== -1
+        return [TYPE_PAY].indexOf(value) !== -1
       }
     },
     color: {
@@ -47,9 +52,7 @@ export default {
       if (this.$store.state['amazon-pay'].amazonPaymentsReady) {
         this.setupWidget()
       } else {
-        this.$bus.$on('amazon-payments-ready', () => {
-          this.setupWidget()
-        })
+        this.$bus.$on('amazon-payments-ready', this.setupWidget)
       }
     }
   },
@@ -68,16 +71,29 @@ export default {
     },
     authorization () {
       window.amazon.Login.authorize({
-        scope: this.type === 'LwA' ? 'profile' : 'profile payments:widget payments:shipping_address',
+        scope: this.type === TYPE_LOGIN ? 'profile' : 'profile payments:widget payments:shipping_address',
         popup: this.popup
-      }, function (res) {
-        console.log('access_token', res.access_token)
-        console.log('expires_in', res.expires_in)
-        console.log('token_type', res.token_type)
-        // showAddressBookWidget();
+      }, this.onAuthorize)
+    },
+    onAuthorize (response) {
+      this.$bus.$emit('notification-progress-start', i18n.t('Authorization in progress ...'))
+      let decodedAccessToken = decodeURIComponent(response.access_token)
+      this.$store.commit('amazon-pay/SET_USER_TOKEN', decodedAccessToken)
 
-        this.$store.dispatch('amazon-pay/login', res.access_token)
-      })
+      // this.$store.dispatch('amazon-pay/getLoginProfile', response.access_token).then(response => {
+      this.$bus.$emit('amazon-authorized', response)
+      switch (this.type) {
+        case TYPE_LOGIN:
+          // TODO: handle login
+          this.$bus.$emit('notification-progress-stop')
+          break
+
+        case TYPE_PAY:
+          this.$bus.$emit('notification-progress-stop')
+          this.$router.push({ name: 'checkout' })
+          break
+      }
+      // })
     }
   }
 }

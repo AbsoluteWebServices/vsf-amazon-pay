@@ -1,5 +1,5 @@
 <template>
-  <div :id="id" />
+  <div :id="id" :class="{loaded}" />
 </template>
 
 <script>
@@ -19,22 +19,23 @@ export default {
   },
   data () {
     return {
-      id: 'amazon-pay-wallet'
+      id: 'amazon-pay-wallet',
+      loaded: false
     }
   },
   mounted () {
     if (config.amazonPay) {
-      if (this.$store.state['amazon-pay'].amazonPaymentsReady) {
+      if (this.$store.state['amazon-pay'].amazonPaymentsReady &&
+        this.$store.state['amazon-pay'].orderReferenceId) {
         this.setupWidget()
       } else {
-        this.$bus.$on('amazon-payments-ready', () => {
-          this.setupWidget()
-        })
+        this.$bus.$on('amazon-order-reference-created', this.setupWidget)
       }
     }
   },
   methods: {
     setupWidget () {
+      this.loaded = false
       new window.OffAmazonPayments.Widgets.Wallet({
         sellerId: config.amazonPay.merchantId,
         design: {
@@ -47,15 +48,16 @@ export default {
       }).bind(this.id)
     },
     onPaymentSelect (orderReference) {
-      console.log(arguments)
       // Replace this code with the action that you want to perform
       // after the payment method is chosen.
 
       // Ideally this would enable the next action for the buyer
       // including either a "Continue" or "Place Order" button.
+      this.$bus.$emit('amazon-payment-selected', orderReference)
     },
     onReady (orderReference) {
-      console.log(orderReference.getAmazonOrderReferenceId())
+      this.loaded = true
+      this.$bus.$emit('amazon-wallet-ready', orderReference)
     },
     onError (error) {
       console.error(error.getErrorCode(), error.getErrorMessage())
@@ -65,7 +67,7 @@ export default {
 </script>
 
 <style scoped>
-#amazon-pay-wallet {
+#amazon-pay-wallet.loaded {
   min-width: 300px;
   max-width: 600px;
   min-height: 228px;
@@ -73,14 +75,14 @@ export default {
 }
 
 /* Mobile optimized and small window */
-#amazon-pay-wallet {
+#amazon-pay-wallet.loaded {
   width: 100%;
   height: 228px;
 }
 
 /* Desktop and tablet */
 @media only screen and (min-width: 768px) {
-  #amazon-pay-wallet {
+  #amazon-pay-wallet.loaded {
     width: 400px;
     height: 228px;
   }

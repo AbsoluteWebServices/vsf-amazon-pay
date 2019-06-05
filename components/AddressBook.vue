@@ -1,5 +1,5 @@
 <template>
-  <div :id="id" />
+  <div :id="id" :class="{loaded}" />
 </template>
 
 <script>
@@ -19,22 +19,23 @@ export default {
   },
   data () {
     return {
-      id: 'amazon-pay-address-book'
+      id: 'amazon-pay-address-book',
+      loaded: false
     }
   },
   mounted () {
+    // TODO: if no token saved - render button component instead
     if (config.amazonPay) {
-      if (this.$store.state['amazon-pay'].amazonPaymentsReady) {
+      if (this.$store.state['amazon-pay'].amazonPaymentsReady && this.$store.state['amazon-pay'].userToken) {
         this.setupWidget()
       } else {
-        this.$bus.$on('amazon-payments-ready', () => {
-          this.setupWidget()
-        })
+        this.$bus.$on('amazon-authorized', this.setupWidget)
       }
     }
   },
   methods: {
     setupWidget () {
+      this.loaded = false
       new window.OffAmazonPayments.Widgets.AddressBook({
         sellerId: config.amazonPay.merchantId,
         design: {
@@ -47,27 +48,18 @@ export default {
       }).bind(this.id)
     },
     onOrderReferenceCreate (orderReference) {
-      console.log(orderReference.getAmazonOrderReferenceId())
       this.$store.commit('amazon-pay/SET_ORDER_REFERENCE_ID', orderReference.getAmazonOrderReferenceId())
+      this.$bus.$emit('amazon-order-reference-created', orderReference.getAmazonOrderReferenceId())
     },
-    onAddressSelect (orderReference) {
-      console.log(arguments)
-      // Replace the following code with the action that you want
-      // to perform after the address is selected. The
-      // amazonOrderReferenceId can be used to retrieve the address
-      // details by calling the GetOrderReferenceDetails operation.
-
-      // If rendering the AddressBook and Wallet widgets
-      // on the same page, you do not have to provide any additional
-      // logic to load the Wallet widget after the AddressBook widget.
-
-      // The Wallet widget will re-render itself on all subsequent
-      // onAddressSelect events without any action from you.
-      // We don't recommend that you explicitly refresh it.
+    onAddressSelect () {
+      this.$bus.$emit('amazon-address-selected')
+      this.$store.dispatch('amazon-pay/getOrderReferenceDetails').then(response => {
+        this.$bus.$emit('amazon-address-available', response.result.Destination)
+      })
     },
     onReady (orderReference) {
-      // Enter code here that you want to be executed
-      // when the address widget has been rendered.
+      this.loaded = true
+      this.$bus.$emit('amazon-address-book-ready', orderReference)
     },
     onError (error) {
       console.error(error.getErrorCode(), error.getErrorMessage())
@@ -77,7 +69,7 @@ export default {
 </script>
 
 <style scoped>
-#amazon-pay-address-book {
+#amazon-pay-address-book.loaded {
   min-width: 300px;
   max-width: 600px;
   min-height: 228px;
@@ -85,14 +77,14 @@ export default {
 }
 
 /* Mobile optimized and small window */
-#amazon-pay-address-book {
+#amazon-pay-address-book.loaded {
   width: 100%;
   height: 228px;
 }
 
 /* Desktop and tablet */
 @media only screen and (min-width: 768px) {
-  #amazon-pay-address-book {
+  #amazon-pay-address-book.loaded {
     width: 400px;
     height: 228px;
   }

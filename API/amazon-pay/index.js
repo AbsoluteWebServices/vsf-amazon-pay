@@ -1,49 +1,116 @@
 import { apiStatus } from '../../../lib/util'
 import { Router } from 'express'
+import HmacSHA256 from 'crypto-js/hmac-sha256'
+import Base64 from 'crypto-js/enc-base64'
+import { URL } from 'url'
+import { parseString } from 'xml2js'
 
-module.exports = ({ config, db }) => {
-  let AmazonPayApi = Router()
+const ALGORITHM = 'HmacSHA256'
 
-  AmazonPayApi.get('/login', (req, res) => {
-    let request = require('request')
-    let decodedAccessToken = decodeURIComponent(req.query.access_token)
-    let encodeAccessToken = encodeURIComponent(decodedAccessToken)
-    let clientId = req.query.client_id
+const calculateStringToSignV2 = (parameters, method, { hostname, pathname }) => {
+  const sorted = {}
+  Object.keys(parameters).sort().forEach((key) => {
+    sorted[key] = encodeURIComponent(parameters[key])
+  })
 
-    // let url = `https://${sandbox_str}.amazon.com/`
+  let data = `${method}\n${hostname}\n${pathname}\n`
 
-    request({
-      url: config.extensions.amazonPay.api.url + '/auth/o2/tokeninfo',
-      method: 'GET',
-      qs: {
-        access_token: encodeAccessToken
+  for (const key in sorted) {
+    if (sorted.hasOwnProperty(key)) {
+      const value = sorted[key]
+      if (value != null) {
+        data += `${key}=${value}`
+      } else {
+        data += `${key}=`
       }
-    }, (error, response, body) => {
+
+      data += '&'
+    }
+  }
+
+  data = data.substr(0, data.length - 1)
+
+  return data
+}
+
+const sign = (data, secretKey) => {
+  let signature = HmacSHA256(data, secretKey)
+  let signatureBase64 = Base64.stringify(signature)
+  return signatureBase64
+}
+
+module.exports = ({ config }) => {
+  let amazonPayApi = Router()
+
+  amazonPayApi.get('/GetOrderReferenceDetails', (req, res) => {
+    let accessKey = config.extensions.amazonPay.accessKey
+    let secretKey = config.extensions.amazonPay.secretKey
+    if (!accessKey || !secretKey) {
+      apiStatus(res, 'No access key is available.', 500)
+      return
+    }
+
+    let sellerId = config.extensions.amazonPay.sellerId
+    if (!sellerId) {
+      apiStatus(res, 'No seller id is available.', 500)
+      return
+    }
+
+    let orderReferenceId = req.query.orderReferenceId
+    if (!orderReferenceId) {
+      apiStatus(res, 'orderReferenceId is required', 500)
+      return
+    }
+
+    let accessToken = decodeURIComponent(req.query.accessToken)
+    if (!accessToken) {
+      apiStatus(res, 'accessToken is required', 500)
+      return
+    }
+
+    const apiVersion = '2013-01-01'
+    const method = 'POST'
+    let t = new Date()
+    let timestamp = t.toISOString()
+    let url = new URL(`${config.extensions.amazonPay.endpoint}/OffAmazonPayments${config.extensions.amazonPay.sandbox ? '_Sandbox' : ''}/${apiVersion}`)
+    let parameters = {
+      'AWSAccessKeyId': accessKey,
+      'Action': 'GetOrderReferenceDetails',
+      'AccessToken': accessToken,
+      'AmazonOrderReferenceId': orderReferenceId,
+      'SellerId': sellerId,
+      'SignatureMethod': ALGORITHM,
+      'SignatureVersion': '2',
+      'Timestamp': timestamp,
+      'Version': apiVersion
+    }
+    let formattedParameters = calculateStringToSignV2(parameters, method, url)
+    let signature = sign(formattedParameters, secretKey)
+    parameters['Signature'] = signature
+
+    let request = require('request')
+    request({
+      url,
+      method,
+      form: parameters
+    }, (error, response, xml) => {
       if (error) {
         apiStatus(res, error, 500)
       } else {
-        let result = JSON.parse(body)
-
-        if (result['aud'] !== clientId) {
-          apiStatus(res, {message: 'Invalid Access Token'}, 500)
-        }
-
-        request({
-          url: config.extensions.amazonPay.api.url + '/user/profile',
-          method: 'GET',
-          auth: {
-            bearer: decodedAccessToken
-          }
-        }, (error, response, body) => {
-          if (error) {
-            apiStatus(res, error, 500)
+        parseString(xml, (err, result) => {
+          if (err) {
+            apiStatus(res, err, 500)
           } else {
-            apiStatus(res, body, 200)
+            if (result.ErrorResponse) {
+              apiStatus(res, { errors: result.ErrorResponse.Error }, 500)
+            } else {
+              apiStatus(res, result.GetOrderReferenceDetailsResponse.GetOrderReferenceDetailsResult[0].OrderReferenceDetails[0], 200)
+            }
           }
         })
       }
     })
   })
 
-  return AmazonPayApi
+  return amazonPayApi
 }

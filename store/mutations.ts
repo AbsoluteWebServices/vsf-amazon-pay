@@ -8,5 +8,11 @@ export const mutations: MutationTree<AmazonPayState> = {
   },
   [types.SET_ORDER_REFERENCE_ID] (state, orderReferenceId) {
     state.orderReferenceId = orderReferenceId
+  },
+  // [types.SET_USER_ID] (state, userId) {
+  //   state.userId = userId
+  // },
+  [types.SET_USER_TOKEN] (state, userToken) {
+    state.userToken = userToken
   }
 }

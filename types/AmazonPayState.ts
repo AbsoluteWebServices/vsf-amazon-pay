@@ -3,6 +3,10 @@
 export interface AmazonPayState {
   amazonPaymentsReady: boolean,
   orderReferenceId: string | null,
+  orderState: string | null,
   // userId: string | null,
-  userToken: string | null
+  userToken: {
+    token: string,
+    expire_at: number
+  } | null
 }

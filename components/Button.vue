@@ -5,6 +5,7 @@
 <script>
 import config from 'config'
 import i18n from '@vue-storefront/i18n'
+import { KEY } from '../index'
 
 const TYPE_LOGIN = 'LwA'
 const TYPE_PAY = 'PwA'
@@ -44,12 +45,13 @@ export default {
   },
   data () {
     return {
-      id: 'amazon-pay-button'
+      id: 'amazon-pay-button',
+      isSet: false
     }
   },
   mounted () {
     if (config.amazonPay) {
-      if (this.$store.state['amazon-pay'].amazonPaymentsReady) {
+      if (this.$store.state[KEY].amazonPaymentsReady) {
         this.setupWidget()
       } else {
         this.$bus.$on('amazon-payments-ready', this.setupWidget)
@@ -58,13 +60,16 @@ export default {
   },
   methods: {
     setupWidget () {
-      window.OffAmazonPayments.Button(this.id, config.amazonPay.merchantId, {
-        type: this.type,
-        color: this.color,
-        size: this.size,
-        authorization: this.authorization,
-        onError: this.onError
-      })
+      if (!this.isSet) {
+        this.isSet = true
+        window.OffAmazonPayments.Button(this.id, config.amazonPay.merchantId, {
+          type: this.type,
+          color: this.color,
+          size: this.size,
+          authorization: this.authorization,
+          onError: this.onError
+        })
+      }
     },
     onError (error) {
       console.error(error.getErrorCode(), error.getErrorMessage())
@@ -78,22 +83,28 @@ export default {
     onAuthorize (response) {
       this.$bus.$emit('notification-progress-start', i18n.t('Authorization in progress ...'))
       let decodedAccessToken = decodeURIComponent(response.access_token)
-      this.$store.commit('amazon-pay/SET_USER_TOKEN', decodedAccessToken)
+      this.$store.dispatch(KEY + '/setUserToken', {
+        token: {
+          token: decodedAccessToken,
+          expire_at: Date.now() + (response.expires_in * 1000)
+        },
+        useCache: true
+      })
 
-      // this.$store.dispatch('amazon-pay/getLoginProfile', response.access_token).then(response => {
-      this.$bus.$emit('amazon-authorized', response)
       switch (this.type) {
         case TYPE_LOGIN:
           // TODO: handle login
+          // this.$store.dispatch(KEY + '/getLoginProfile', response.access_token).then(response => {
+          // })
           this.$bus.$emit('notification-progress-stop')
           break
 
         case TYPE_PAY:
           this.$bus.$emit('notification-progress-stop')
-          this.$router.push({ name: 'checkout' })
           break
       }
-      // })
+      this.$bus.$emit('amazon-authorized', { type: this.type, response })
+      this.$emit('authorized', { type: this.type, response })
     }
   }
 }

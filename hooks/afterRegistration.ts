@@ -14,7 +14,8 @@ export function afterRegistration({ Vue, config, store, isServer }) {
       'costInclTax': 0,
       'default': false,
       'offline': false,
-      'is_server_method': false
+      'is_server_method': false,
+      'hidden': true
     })
 
     if (!isServer) {

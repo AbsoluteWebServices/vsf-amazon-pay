@@ -47,9 +47,7 @@ export default {
     }
   },
   watch: {
-    readOnly (val) {
-      // TODO: check why this don't fire
-      console.log('readOnly', val)
+    readOnly: function (newVal, oldVal) {
       this.setupWidget(true)
     }
   },

@@ -19,10 +19,15 @@ export default {
         return ['responsive', 'smartphoneCollapsible'].indexOf(value) !== -1
       }
     },
-    setShipping: {
+    savePaymentDetails: {
       type: Boolean,
       required: false,
-      default: true
+      default: false
+    },
+    saveShippingDetails: {
+      type: Boolean,
+      required: false,
+      default: false
     }
   },
   data () {
@@ -33,6 +38,9 @@ export default {
     }
   },
   computed: {
+    checkoutPaymentDetails () {
+      return this.$store.state.checkout.paymentDetails
+    },
     checkoutShippingDetails () {
       return this.$store.state.checkout.shippingDetails
     },
@@ -55,9 +63,7 @@ export default {
     }
   },
   watch: {
-    readOnly (val) {
-      // TODO: check why this don't fire
-      console.log('readOnly', val)
+    readOnly: function (newVal, oldVal) {
       this.setupWidget(true)
     }
   },
@@ -87,9 +93,7 @@ export default {
   },
   methods: {
     setupWidget (force = false) {
-      console.log('setupWidget')
       if (force || !this.isSet) {
-        console.log('setting up Widget')
         this.isSet = true
         this.loaded = false
         new window.OffAmazonPayments.Widgets.AddressBook({
@@ -119,10 +123,9 @@ export default {
         this.$store.dispatch(KEY + '/getOrderReferenceDetails').then(response => {
           this.$bus.$emit('amazon-address-available', response.result.Destination)
 
-          if (this.setShipping && response.result.Destination.DestinationType === 'Physical') {
+          if (response.result.Destination.DestinationType === 'Physical') {
             let name = response.result.Destination.PhysicalDestination.Name.split(' ', 2)
-
-            let shipping = {
+            let address = {
               firstName: name[0],
               lastName: name.length > 1 ? name[1] : '',
               country: response.result.Destination.PhysicalDestination.CountryCode,
@@ -131,12 +134,26 @@ export default {
               streetAddress: response.result.Destination.PhysicalDestination.AddressLine1,
               apartmentNumber: response.result.Destination.PhysicalDestination.AddressLine2,
               zipCode: response.result.Destination.PhysicalDestination.PostalCode,
-              phoneNumber: response.result.Destination.PhysicalDestination.Phone,
-              shippingMethod: this.checkoutShippingDetails.shippingMethod,
-              shippingCarrier: this.checkoutShippingDetails.shippingCarrier
+              phoneNumber: response.result.Destination.PhysicalDestination.Phone
             }
 
-            this.$bus.$emit('checkout-after-shippingset', shipping)
+            if (this.savePaymentDetails) {
+              let payment = {
+                ...address,
+                paymentMethod: this.checkoutPaymentDetails.paymentMethod,
+                paymentMethodAdditional: this.checkoutPaymentDetails.paymentMethodAdditional
+              }
+              this.$store.dispatch('checkout/savePaymentDetails', payment)
+            }
+
+            if (this.saveShippingDetails) {
+              let shipping = {
+                ...address,
+                shippingMethod: this.checkoutShippingDetails.shippingMethod,
+                shippingCarrier: this.checkoutShippingDetails.shippingCarrier
+              }
+              this.$store.dispatch('checkout/saveShippingDetails', shipping)
+            }
           }
         })
       }

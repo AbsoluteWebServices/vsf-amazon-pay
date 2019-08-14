@@ -105,7 +105,7 @@ export const actions: ActionTree<AmazonPayState, any> = {
     commit(types.SET_ORDER_STATE, states.DRAFT)
 
     let CurrencyCode = rootStore.state.cart.platformTotals.base_currency_code
-    let totals = rootStore.getters['cart/totals']
+    let totals = rootStore.getters['cart/getTotals']
     let Amount = 0.00
 
     totals.forEach(total => {
@@ -113,7 +113,7 @@ export const actions: ActionTree<AmazonPayState, any> = {
         Amount += total.value
       }
     })
-    
+
     let orderReferenceAttributes = {
       OrderTotal: {
         Amount,
@@ -151,7 +151,7 @@ export const actions: ActionTree<AmazonPayState, any> = {
   },
   authorizeOrder({ state }): Promise<Response> {
     let CurrencyCode = rootStore.state.cart.platformTotals.base_currency_code
-    let totals = rootStore.getters['cart/totals']
+    let totals = rootStore.getters['cart/getTotals']
     let Amount = 0.00
 
     totals.forEach(total => {

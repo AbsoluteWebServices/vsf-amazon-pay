@@ -1,20 +1,18 @@
-import { KEY } from '../index'
+import { KEY, METHOD_CODE } from '../index'
 import * as types from '../store/mutation-types'
 import * as states from '../store/order-states'
 
 export function afterRegistration({ Vue, config, store, isServer }) {
-  if (config.amazonPay) {
-    const CURRENT_METHOD_CODE = KEY
-  
+  if (config.amazonPay) { 
     // Update the methods
     store.dispatch('payment/addMethod', {
       'title': 'Amazon Pay',
-      'code': CURRENT_METHOD_CODE,
+      'code': METHOD_CODE,
       'cost': 0,
       'costInclTax': 0,
       'default': false,
       'offline': false,
-      'is_server_method': false,
+      'is_server_method': config.amazonPay.backend_method_code ? true : false,
       'hidden': true
     })
 
@@ -49,7 +47,7 @@ export function afterRegistration({ Vue, config, store, isServer }) {
       let correctPaymentMethod = false
 
       Vue.prototype.$bus.$on('checkout-payment-method-changed', (paymentMethodCode) => {
-        if (paymentMethodCode === CURRENT_METHOD_CODE) {
+        if (paymentMethodCode === METHOD_CODE) {
           correctPaymentMethod = true
         } else {
           correctPaymentMethod = false

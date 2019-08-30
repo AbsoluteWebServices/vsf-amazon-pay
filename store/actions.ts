@@ -1,6 +1,7 @@
 import { AmazonPayState } from '../types/AmazonPayState'
 import { ActionTree } from 'vuex'
 import config from 'config'
+import fetch from 'isomorphic-fetch'
 import rootStore from '@vue-storefront/core/store'
 import * as types from './mutation-types'
 import * as states from './order-states'

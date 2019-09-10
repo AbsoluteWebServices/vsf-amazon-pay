@@ -12,7 +12,7 @@ export function afterRegistration({ Vue, config, store, isServer }) {
       'costInclTax': 0,
       'default': false,
       'offline': false,
-      'is_server_method': config.amazonPay.backend_method_code ? true : false,
+      'is_server_method': false,
       'hidden': true
     })
 
